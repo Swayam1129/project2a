@@ -156,6 +156,16 @@ The sky is black because that's the color of the sky tile in the background spri
 I was given.
 
 
+Efficiency:
+
+Where a system only needs one kind of component, it loops over that component's storage
+instead of over every entity: ProcessEvents only goes through the InputComponents,
+ScoreSystem through the ScoreComponents, and SpawnSystem through the SpawnComponents (each
+one stores its own entity id). The tiles never move, so CollisionSystem builds the list of
+tile boxes once on the first frame and reuses it after that, instead of rebuilding it every
+frame.
+
+
 Testing:
 
 EngineTest.cpp tests the EntityManager: creating entities, removing them and reusing ids,

@@ -28,6 +28,7 @@ const float kStarRestSpeed = 1.5f;  // slower vertical bounces than this just st
 const float kStarRollFriction = 0.9f;
 
 // Resolves collisions between moving entities and static entities (tiles).
+// Static entities are assumed to stay where the map put them (their boxes are cached).
 // For each moving entity it replays this frame's movement in two steps, starting from
 // previousCollisionBox (saved by CollisionLateSystem):
 //   1. move sideways  -> if it hits a tile, stop at the tile edge (onLeftWall / onRightWall)
@@ -52,24 +53,25 @@ public:
     tSystemReturn Run(EngineView<Components...>* engine) override {
         auto& em = engine->GetEntityManager();
 
-        // Find the camera shake (if any) so hits can trigger it.
+        // Find the camera shake (if any) so hits can trigger it. Only the CameraShake storage
+        // is searched, not every entity.
         mShake = nullptr;
-        for (const Entity& e : em) {
-            if (em.IsValid(e.GetID()) && em.template HasComponent<CameraShake>(e.GetID())) {
-                mShake = &em.template GetComponent<CameraShake>(e.GetID());
-                break;
-            }
-        }
+        auto& shakes = em.template GetComponentStorage<CameraShake>();
+        for (size_t i = 0; i < shakes.mStorage.size() && !mShake; ++i)
+            if (shakes.mValid[i]) mShake = &shakes.mStorage[i];
 
-        // Gather static boxes once per frame.
-        mStatic.clear();
-        for (const Entity& e : em) {
-            EntityID id = e.GetID();
-            if (!IsCollider(em, id)) continue;
-            const auto& col = em.template GetComponent<CollisionComponent>(id);
-            if (!col.staticEntity) continue;
-            const Point2D& loc = em.template GetComponent<LocationComponent>(id).loc;
-            mStatic.push_back({Offset(col.collisionBox, loc), col.doesDamage != 0});
+        // Static tiles never move, so their world boxes are collected once (on the first
+        // frame) and reused every frame after that.
+        if (!mStaticReady) {
+            for (const Entity& e : em) {
+                EntityID id = e.GetID();
+                if (!IsCollider(em, id)) continue;
+                const auto& col = em.template GetComponent<CollisionComponent>(id);
+                if (!col.staticEntity) continue;
+                const Point2D& loc = em.template GetComponent<LocationComponent>(id).loc;
+                mStatic.push_back({Offset(col.collisionBox, loc), col.doesDamage != 0});
+            }
+            mStaticReady = true;
         }
 
         for (const Entity& e : em) {
@@ -219,9 +221,10 @@ private:
     static void Collect(EngineView<Components...>* engine, EntityID item) {
         auto& em = engine->GetEntityManager();
         em.RemoveEntity(item);
-        for (const Entity& e : em) {
-            if (em.IsValid(e.GetID()) && em.template HasComponent<ScoreComponent>(e.GetID())) {
-                ++em.template GetComponent<ScoreComponent>(e.GetID()).score;
+        auto& scores = em.template GetComponentStorage<ScoreComponent>();
+        for (size_t i = 0; i < scores.mStorage.size(); ++i) {
+            if (scores.mValid[i]) {
+                ++scores.mStorage[i].score;
                 break;
             }
         }
@@ -276,7 +279,8 @@ private:
     }
 
     std::vector<EntityID> mDynamic;  // moving/collectable entities this frame
-    std::vector<StaticBox> mStatic;  // reused every frame to avoid reallocating
+    std::vector<StaticBox> mStatic;  // world boxes of all static tiles (built on the first frame)
+    bool mStaticReady = false;       // static tiles must not move or be removed after loading
     CameraShake* mShake = nullptr;   // camera shake found this frame (valid only during Run)
 };
 

@@ -115,14 +115,11 @@ template <typename... Components>
 bool ECSEngine<Components...>::ProcessEvents() {
     constexpr bool kHasInput = (std::is_same_v<InputComponent, Components> || ...);
 
+    // Only InputComponents are touched, so loop over their storage instead of all entities.
     if constexpr (kHasInput) {
-        for (const Entity& e : mEntityManager) {
-            if (mEntityManager.IsValid(e.GetID()) &&
-                mEntityManager.template HasComponent<InputComponent>(e.GetID())) {
-                auto& input = mEntityManager.template GetComponent<InputComponent>(e.GetID());
-                input.lastKeydown = input.keydown;
-            }
-        }
+        auto& inputs = mEntityManager.template GetComponentStorage<InputComponent>();
+        for (size_t i = 0; i < inputs.mStorage.size(); ++i)
+            if (inputs.mValid[i]) inputs.mStorage[i].lastKeydown = inputs.mStorage[i].keydown;
     }
 
     auto window = mWindowManager.GetWindow();
@@ -151,13 +148,9 @@ bool ECSEngine<Components...>::ProcessEvents() {
         if (index < 0 || index >= static_cast<int>(sf::Keyboard::ScancodeCount)) continue;
 
         if constexpr (kHasInput) {
-            for (const Entity& e : mEntityManager) {
-                if (mEntityManager.IsValid(e.GetID()) &&
-                    mEntityManager.template HasComponent<InputComponent>(e.GetID())) {
-                    mEntityManager.template GetComponent<InputComponent>(e.GetID())
-                        .keydown[index] = pressed;
-                }
-            }
+            auto& inputs = mEntityManager.template GetComponentStorage<InputComponent>();
+            for (size_t i = 0; i < inputs.mStorage.size(); ++i)
+                if (inputs.mValid[i]) inputs.mStorage[i].keydown[index] = pressed;
         }
     }
     return true;

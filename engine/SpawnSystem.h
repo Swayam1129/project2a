@@ -42,12 +42,13 @@ public:
         };
         std::vector<Pending> pending;
 
-        for (const Entity& e : em) {
-            EntityID id = e.GetID();
-            if (!em.IsValid(id) || !em.template HasComponent<SpawnComponent>(id) ||
-                !em.template HasComponent<LocationComponent>(id))
-                continue;
-            SpawnComponent& spawn = em.template GetComponent<SpawnComponent>(id);
+        // Loop over the SpawnComponent storage only; each spawner knows its own entity.
+        auto& spawns = em.template GetComponentStorage<SpawnComponent>();
+        for (size_t i = 0; i < spawns.mStorage.size(); ++i) {
+            if (!spawns.mValid[i]) continue;
+            SpawnComponent& spawn = spawns.mStorage[i];
+            EntityID id = spawn.entityID;
+            if (!em.IsValid(id) || !em.template HasComponent<LocationComponent>(id)) continue;
             if (spawn.totalSpawns <= 0 || --spawn.timeToNextSpawn > 0) continue;
             spawn.timeToNextSpawn = spawn.timeBetweenSpawns;
             --spawn.totalSpawns;

@@ -14,6 +14,7 @@
 namespace ECSEngine {
 
 // Shows the score: sets each digit entity's sprite to the matching digit (000 to 999).
+// Loops over the ScoreComponent storage only.
 template <typename... Components>
 class ScoreSystem : public System<Components...> {
 public:
@@ -24,10 +25,10 @@ public:
 
     tSystemReturn Run(EngineView<Components...>* engine) override {
         auto& em = engine->GetEntityManager();
-        for (const Entity& e : em) {
-            EntityID id = e.GetID();
-            if (!em.IsValid(id) || !em.template HasComponent<ScoreComponent>(id)) continue;
-            const ScoreComponent& score = em.template GetComponent<ScoreComponent>(id);
+        auto& scores = em.template GetComponentStorage<ScoreComponent>();
+        for (size_t s = 0; s < scores.mStorage.size(); ++s) {
+            if (!scores.mValid[s]) continue;
+            const ScoreComponent& score = scores.mStorage[s];
             int value = score.score % 1000;
             int digits[3] = {value / 100, (value / 10) % 10, value % 10};
             for (int i = 0; i < 3; ++i) {
