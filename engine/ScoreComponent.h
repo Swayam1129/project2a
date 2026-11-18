@@ -1,19 +1,17 @@
 #pragma once
 
-#include <unordered_map>
-
+#include "Entity.h"
 #include "MathUtil.h"
 #include "SpriteManager.h"
 
 namespace ECSEngine {
 
-// The sprite rectangle is relative to the entity location in the world
-// This is only defined if an entity also has a LocationComponent.
+// The game score. ScoreSystem shows it with three digit entities (hundreds, tens, ones).
 class ScoreComponent {
 public:
-    int score;
-    SpriteID digitTextureID[10];
-    EntityID digitID[3];
+    int score;                    // points collected so far
+    SpriteID digitTextureID[10];  // sprite for each digit 0..9
+    EntityID digitID[3];          // entities drawing the hundreds, tens and ones digits
 
 private:
 };

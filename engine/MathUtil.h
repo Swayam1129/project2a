@@ -5,8 +5,6 @@
 
 namespace ECSEngine {
 
-#include <cstdio>
-
 struct Point2D {
     float x, y;
     Point2D(float x = 0, float y = 0) : x(x), y(y) {}
@@ -50,6 +48,17 @@ struct Rect {
 [[maybe_unused]] static std::ostream& operator<<(std::ostream& os, const Rect& r) {
     os << "R{" << r.topLeft << ", " << r.width << "x" << r.height << "}";
     return os;
+}
+
+// Returns r moved by offset (used to turn an entity-relative box into a world box).
+[[maybe_unused]] static Rect Offset(const Rect& r, const Point2D& offset) {
+    return Rect{Point2D(r.topLeft.x + offset.x, r.topLeft.y + offset.y), r.width, r.height};
+}
+
+// True if the two rectangles overlap. Rectangles that only touch along an edge do not overlap.
+[[maybe_unused]] static bool Overlaps(const Rect& a, const Rect& b) {
+    return a.topLeft.x < b.topLeft.x + b.width && b.topLeft.x < a.topLeft.x + a.width &&
+           a.topLeft.y < b.topLeft.y + b.height && b.topLeft.y < a.topLeft.y + a.height;
 }
 
 }  // namespace ECSEngine

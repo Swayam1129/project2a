@@ -1,0 +1,166 @@
+CMPUT 350 Project 2 Part 1 ECS engine + platformer
+
+Author
+
+Swayam Sagar (1808475)
+
+
+How to build and run
+
+cmake --preset debug
+cmake --build build
+cd build/platformer
+./platformer
+
+You can pass -path <folder> if the assets are somewhere else (default is ../assets/).
+Note the assets folder only gets copied into build/ when you run the configure step, so if
+a map or image changes you need to run "cmake --preset debug" again.
+
+The EntityManager tests are in engine/EngineTest.cpp. Run them with ./build/engine/ECSTest
+from the project folder.
+
+Controls
+
+arrow keys move (left/right also work in the air), down = fall faster
+z jump. Hold it for a full jump, let go early for a small one. Pressing z while you are
+sliding on a wall does a wall jump.
+c dash (once per second)
+
+I also added some keys for debugging:
+p pause, n step one frame while paused, d show collision boxes (green for tiles,
+red for things that move), esc quit
+
+
+Notes on the managers
+
+The engine owns all the managers and they live until the game closes. The systems only get
+to them through the EngineView that is passed into Run(), they don't store them.
+
+EntityManager:
+An EntityID is just the index of the entity in a vector. When you remove an entity the slot
+stays there and gets marked as not valid, and the id goes on a free list so the next
+CreateEntity can reuse it. Because of that, when you loop over the entities you have to check
+IsValid() to skip the holes. I added IsValid() to the interface for this.
+
+Every component type has its own ComponentStorage (they're kept in a tuple). I added
+mEntityToIndex to ComponentStorage so I can go from an entity id to where its component is
+stored. kNullComponent means the entity doesn't have that component.
+
+Important: GetComponent gives back a reference into a vector. If you add another component
+of the same type, the vector can resize and that reference is no longer good. So don't hold
+on to component references, keep the EntityID and look it up again. Same thing for creating
+entities while looping over them, so SpawnSystem makes a list first and creates the stars
+after the loop. RemoveEntity also removes all the components of that entity.
+
+SpriteManager:
+Textures are kept in an unordered_map by file path, so each image is only loaded once and the
+texture doesn't move in memory (the sprites point to it). Sprites are in a vector and the
+SpriteID is the index, which stays valid as long as the manager exists. The sf::Sprite& from
+GetSprite() can be invalidated by the next RegisterTexture(), so keep the id.
+
+SoundManager:
+Buffers and sounds are both in unordered_maps by name so the references don't move.
+GetSound() asserts if the name wasn't registered. If you register the same name twice, the
+new one replaces the old one. The sound names I use are in SoundNames.h.
+
+WindowManager:
+I store the camera as the world point that is at the center of the window
+(mWorldCenter) and how many world units one pixel is (mWorldUnitsPerPixel).
+window = (world mWorldCenter) / mWorldUnitsPerPixel + window center
+world= (window window center) * mWorldUnitsPerPixel + mWorldCenter
+The float versions convert a length, not a position. SetWorldRect picks the zoom so the whole
+rect fits on screen. The debug draw functions take rects in world coordinates.
+
+ECSEngine:
+Each frame: handle events, clear the window, run the systems in order, draw the debug
+boxes if they're on, then display(). I call display() in the engine after all the systems
+instead of inside SpriteSystem, so the debug boxes can be drawn on top of the sprites. The
+order things show up on screen is still the same. ProcessEvents() saves last frame's keys
+into lastKeydown and then updates keydown in every InputComponent from the SFML key events.
+
+
+Components:
+
+Every component has its own header in engine/. A few things that matter:
+LocationComponent is the top left of the entity and all the other boxes are relative to it.
+CollisionComponent uses bit fields for the flags to keep it small. collisionBox is relative
+to the location. previousCollisionBox is in world coordinates and is where the box was at
+the start of the frame.
+GravityComponent has disabledTimer, which the dash uses to turn gravity off for a few frames.
+CameraFollower and CameraShake are in CameraFollowerComponent.h / CameraShakeComponent.h.
+Everything is in pixels and frames. The game is locked at 60 fps.
+
+
+Systems (in the order they run):
+
+CollisionLateSystem saves the collision box of everything that moves before it moves.
+
+InputSystem left/right speed you up until a max speed, and slow you down with friction
+when you let go (less control in the air). Z jumps off the ground or wall jumps off a wall.
+If you let go of z while going up, the jump gets cut. C dashes, then waits 60 frames before
+you can dash again. It uses the collision flags from the last frame.
+
+GravitySystem gravity is stronger going down than going up, and stronger again if you hold
+down. If you're falling and pushing into a wall you fall slowly and it plays a sound.
+
+MovementSystem adds velocity to location.
+
+CollisionSystem takes the move from this frame and does it again from the old box, first
+in x and then in y, and stops at the edge of any tile it hits. Doing x and y separately stops
+the player getting stuck on the corners between tiles. This is where onGround, onCeiling and
+the wall flags get set. Spikes send the player back to the respawn point. If you hit
+something fast the camera shakes in that direction, more if you were going faster. Stars
+bounce off tiles (losing some speed each time) and off each other, and if the player touches
+a star it gets removed and the score goes up.
+
+ScoreSystem updates the 3 digit sprites in the top left.
+
+CameraSystem the camera's y doesn't change, only x. If the player leaves the middle 40%
+of the screen the camera slowly moves toward them, and keeps going after they stop until
+they're back in the middle. The player can never get into the outer 10%, the camera just
+jumps to keep them out. Then it adds the shake and sets the camera in the WindowManager.
+
+SpriteSystem draws everything with a sprite, either in the world or on the screen (the
+score uses screen space so it doesn't move with the camera).
+
+SpawnSystem the spawner (the S tile in world.map) makes a star every 1.5 seconds, 30 in
+total, going in a random direction.
+
+
+Loading the maps:
+
+LoadMap in main.cpp reads the format from the assignment. It reads the dictionary lines until
+it hits "map", then the origin/tile size/grid size, then the grid. Every letter becomes an
+entity with a location and a sprite, and in a dictionary 2 file it also gets a static
+collision box. Dots are empty. I load sky.map first so it's behind world.map. In world.map
+the x tiles are spikes and the S tile becomes the spawner. I didn't change the map layout.
+
+I placed two extra stars by hand: one past the first spiky walls to test wall jumping, and
+one past the second set to test the dash.
+
+
+Gameplay / tuning notes:
+
+First spiky walls: you get up by wall jumping between the two walls, then jump over the
+right one.
+Second set: you go across the tops of the walls. The gaps are too far for a normal jump so
+you need to jump and then dash. I set the run speed to 8.5 because at 10 you could just
+barely make the second gap without dashing.
+The spike hitbox in world.map is shorter than the picture of the spikes (10 px missing on
+the top and bottom). Next to a normal tile you could touch the spikes from below and not
+die, which looked wrong, so the player also gets hurt if they're within 11 px above or
+below a spike (kSpikeTouchReach in CollisionSystem.h).
+All the tuning numbers are constants at the top of InputSystem.h, GravitySystem.h,
+CollisionSystem.h, CameraSystem.h, SpawnSystem.h and main.cpp.
+The sky is black because that's the color of the sky tile in the background sprite sheet
+I was given.
+
+
+Testing:
+
+EngineTest.cpp tests the EntityManager: creating entities, removing them and reusing ids,
+skipping removed ones when looping, adding/overwriting/removing components, reusing component
+slots, and RemoveEntity getting rid of all the components.
+It compiles with no warnings with -Wall -Wextra -Wpedantic on GCC 9 (same as the lab).
+
+

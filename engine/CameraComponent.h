@@ -1,34 +1,20 @@
 #pragma once
 
-#include <unordered_map>
-
-#include "Entity.h"
-#include "LocationComponent.h"
+#include "CameraFollowerComponent.h"
+#include "CameraShakeComponent.h"
 #include "MathUtil.h"
-#include "SpriteComponent.h"
-#include "SystemManager.h"
-#include <SFML/Graphics/Sprite.hpp>
-#include <SFML/Graphics/Texture.hpp>
 
 namespace ECSEngine {
 
+// The camera. CameraSystem moves it to follow an entity and copies it into the WindowManager.
 struct CameraComponent {
-    Point2D position;  // [world coordinates] position in world coordinates
-    float worldUnitsPerPixel;
-    Rect hardExclusion;  // [screen coordinates] Area where the camera is not allowed to go
-                         // (negative of this rect)
-    Rect softExclusion;  // [screen coordinates] Area where the camera is allowed to go (but will
-                         // scroll out)
-    float speed;
-};
-
-struct CameraFollower {
-    EntityID entityID;  // The entity that this camera follows
-};
-
-struct CameraShake {
-    int frameLimit;
-    Point2D offset;
+    Point2D position;          // [world] point shown at the window center (before shake)
+    float worldUnitsPerPixel;  // zoom (1 = one world unit per pixel)
+    Rect hardExclusion;  // [screen] the followed entity must stay inside this rect; outside it
+                         // the camera snaps to keep it in (outer 10% of the width)
+    Rect softExclusion;  // [screen] center region; outside it the camera eases toward the
+                         // entity until the entity is back inside (center 40% of the width)
+    float speed;         // easing fraction per frame (0..1); bigger = camera catches up faster
 };
 
 }  // namespace ECSEngine

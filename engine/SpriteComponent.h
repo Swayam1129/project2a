@@ -1,12 +1,7 @@
 #pragma once
 
-#include <bitset>
-#include <unordered_map>
-
 #include "MathUtil.h"
 #include "SpriteManager.h"
-#include <SFML/Graphics/Sprite.hpp>
-#include <SFML/Graphics/Texture.hpp>
 
 namespace ECSEngine {
 
@@ -14,8 +9,9 @@ namespace ECSEngine {
 // This is only defined if an entity also has a LocationComponent.
 class SpriteComponent {
 public:
-    SpriteID textureID;
-    Rect bounds;
+    SpriteID textureID;  // sprite from the SpriteManager
+    Rect bounds;         // where to draw, relative to the LocationComponent; the image is
+                         // scaled to fill this rect
     bool worldSpace;  // If false, this sprite is drawn in screen space instead of world space
 private:
 };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+#include <string>
 #include <unordered_map>
 
 #include "MathUtil.h"
@@ -8,6 +10,9 @@
 
 namespace ECSEngine {
 
+// Owns the SFML window and the camera transform between world coordinates and window pixels.
+// GetWindow() returns a shared_ptr; the window lives as long as the WindowManager (or longer, if
+// a caller keeps a copy of the pointer). All Rect/Point2D results are returned by value.
 class WindowManager {
 public:
     WindowManager(unsigned int width, unsigned int height, const std::string& title);
@@ -33,7 +38,11 @@ public:
     void DebugFrameRect(const Rect& r, int red, int green, int blue, int alpha = 255);
 
 private:
+    Point2D WindowCenter() const;  // center of the window in pixels
+
     std::shared_ptr<sf::RenderWindow> mWindow;
+    Point2D mWorldCenter;        // world point shown at the center of the window
+    float mWorldUnitsPerPixel;   // how many world units one pixel covers (2 = zoomed out)
 };
 
 }  // namespace ECSEngine
